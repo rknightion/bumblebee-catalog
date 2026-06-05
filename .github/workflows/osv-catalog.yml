@@ -35,17 +35,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout this repo (CI scripts)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout bumblebee (pinned)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.BUMBLEBEE_REPO }}
           ref: ${{ env.BUMBLEBEE_SHA }}
           path: bumblebee
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: bumblebee/go.mod
 
