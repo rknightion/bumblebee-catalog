@@ -8,9 +8,12 @@ import sys
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ndjson", required=True)
-    ap.add_argument("--expect", required=True)  # "package@version"
+    ap.add_argument("--seed-file", required=True)  # {"package":..., "version":...}
     a = ap.parse_args()
-    name, _, ver = a.expect.rpartition("@")
+    with open(a.seed_file) as f:
+        seed = json.load(f)
+    name, ver = seed["package"], seed["version"]
+    expect = f"{name}@{ver}"
 
     findings = []
     with open(a.ndjson) as f:
@@ -30,11 +33,11 @@ def main():
             rec.get("package_name"),
             rec.get("normalized_name"),
         ):
-            print(f"OK: finding emitted for {a.expect} "
+            print(f"OK: finding emitted for {expect} "
                   f"(catalog_id={rec.get('catalog_id')}, severity={rec.get('severity')})")
             return
     seen = [f"{f.get('package_name')}@{f.get('version', '')}" for f in findings][:5]
-    sys.exit(f"FAIL: no finding for {a.expect}; saw {len(findings)} finding record(s): {seen}")
+    sys.exit(f"FAIL: no finding for {expect}; saw {len(findings)} finding record(s): {seen}")
 
 
 if __name__ == "__main__":

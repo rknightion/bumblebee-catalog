@@ -52,6 +52,10 @@ def main():
     }
     with open(os.path.join(a.out, "package-lock.json"), "w") as f:
         json.dump(lock, f, indent=2)
+    # Write the seed to a file (not argv) — package names can start with '-',
+    # which argparse would mis-parse as a flag.
+    with open(os.path.join(a.out, "seed.json"), "w") as f:
+        json.dump({"package": name, "version": ver}, f)
     print(f"{name}@{ver}")
 
 

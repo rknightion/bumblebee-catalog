@@ -101,7 +101,7 @@ jobs:
             --exposure-catalog "$OUTPUT" \
             --max-duration 2m \
             --output file --output-file scan.ndjson
-          python3 ci/assert_finding.py --ndjson scan.ndjson --expect "$PKGVER"
+          python3 ci/assert_finding.py --ndjson scan.ndjson --seed-file fixture/seed.json
 
       - name: Publish catalog-latest release asset
         env:
