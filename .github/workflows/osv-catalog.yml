@@ -1,0 +1,118 @@
+name: Generate OSV exposure catalog
+
+# Regenerates the Bumblebee OSV exposure catalog from the OSSF malicious-packages
+# feed and publishes it as the `catalog-latest` release asset that endpoints fetch.
+#
+# Cadence: every 4h. The OSSF feed ingests new malicious packages roughly every
+# 4-5h (~18 commits/day), so 4h keeps us within one ingest batch of upstream.
+
+on:
+  schedule:
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+    inputs:
+      force_publish:
+        description: 'Publish even if entry count drops >10% vs last-good'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write          # create/update the catalog-latest release
+
+concurrency:
+  group: osv-catalog
+  cancel-in-progress: false
+
+env:
+  BUMBLEBEE_REPO: perplexityai/bumblebee
+  # Pinned: tools/osvcatalog was added AFTER the v0.1.1 tag, so we pin a commit
+  # that contains it. Keep schema_version (0.1.0) in sync with the deployed binary.
+  BUMBLEBEE_SHA: 156df7a272c9fc6bdd74df04fdabbf99477214de
+  OUTPUT: osv-malicious.json
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo (CI scripts)
+        uses: actions/checkout@v4
+
+      - name: Checkout bumblebee (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.BUMBLEBEE_REPO }}
+          ref: ${{ env.BUMBLEBEE_SHA }}
+          path: bumblebee
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: bumblebee/go.mod
+
+      - name: Build bumblebee (for the positive-match self-test)
+        working-directory: bumblebee
+        run: go build -o "$GITHUB_WORKSPACE/bin/bumblebee" ./cmd/bumblebee
+
+      - name: Sparse-checkout OSSF malicious-packages
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout --depth 1 \
+            https://github.com/ossf/malicious-packages.git mp
+          git -C mp sparse-checkout init --cone
+          git -C mp sparse-checkout set osv/malicious
+          git -C mp checkout
+          echo "OSSF_SHA=$(git -C mp rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Generate catalog
+        working-directory: bumblebee
+        run: |
+          set -euo pipefail
+          go run ./tools/osvcatalog \
+            -source "https://github.com/ossf/malicious-packages@${OSSF_SHA}" \
+            -o "$GITHUB_WORKSPACE/$OUTPUT" \
+            "$GITHUB_WORKSPACE/mp/osv/malicious/"
+
+      - name: Download last-good (floor check)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p old
+          gh release download catalog-latest --repo "$GITHUB_REPOSITORY" \
+            -p "$OUTPUT" -D old || echo "no previous release yet"
+
+      - name: Validate + write meta
+        run: |
+          set -euo pipefail
+          python3 ci/validate.py \
+            --catalog "$OUTPUT" \
+            --old "old/$OUTPUT" \
+            --ossf-sha "$OSSF_SHA" \
+            --bumblebee-sha "$BUMBLEBEE_SHA" \
+            ${{ github.event.inputs.force_publish == 'true' && '--force' || '' }}
+
+      - name: Positive-match self-test (catalog actually matches)
+        run: |
+          set -euo pipefail
+          PKGVER=$(python3 ci/make_fixture.py --catalog "$OUTPUT" --out fixture)
+          echo "seeded fixture package: $PKGVER"
+          "$GITHUB_WORKSPACE/bin/bumblebee" scan \
+            --profile project --root fixture \
+            --exposure-catalog "$OUTPUT" \
+            --max-duration 2m \
+            --output file --output-file scan.ndjson
+          python3 ci/assert_finding.py --ndjson scan.ndjson --expect "$PKGVER"
+
+      - name: Publish catalog-latest release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh release view catalog-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create catalog-latest --repo "$GITHUB_REPOSITORY" \
+              --latest --title "OSV exposure catalog (rolling)" \
+              --notes "Auto-generated rolling Bumblebee exposure catalog from the OSSF malicious-packages feed. The tag is a moving pointer; see catalog-meta.json for provenance (generated_at, ossf_sha, bumblebee_sha, entry_count)."
+          fi
+          gh release upload catalog-latest --repo "$GITHUB_REPOSITORY" --clobber \
+            "$OUTPUT" catalog-meta.json
+          echo "Published $OUTPUT ($(python3 -c "import json;print(len(json.load(open('$OUTPUT'))['entries']))") entries)"

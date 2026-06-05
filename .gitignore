@@ -1,0 +1,11 @@
+# CI build artifacts (generated in the runner, never committed)
+/osv-malicious.json
+/catalog-meta.json
+/bin/
+/mp/
+/old/
+/fixture/
+/bumblebee/
+scan.ndjson
+__pycache__/
+*.pyc
