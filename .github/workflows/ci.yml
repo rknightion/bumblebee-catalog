@@ -1,0 +1,33 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Syntax-check CI scripts
+        run: python3 -m py_compile ci/*.py
+  ci-success:
+    name: ci-success
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [validate]
+    steps:
+      - name: Fail if any required job did not pass
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "A required job failed: ${{ join(needs.*.result, ', ') }}"
+          exit 1
+      - name: All required jobs passed
+        run: echo "ci-success"
