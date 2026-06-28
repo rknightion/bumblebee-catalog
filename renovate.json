@@ -1,3 +1,5 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json"
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "No pull_request CI here, so there is no ci-success check to gate a ruleset on. Renovate self-merges its automerge-eligible PRs directly (platformAutomerge:false) instead of GitHub native auto-merge - i.e. traditional merge without required checks. If real PR CI is added later, add a ci-success ruleset and drop this override.",
+  "platformAutomerge": false
 }
