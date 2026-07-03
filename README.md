@@ -1,5 +1,7 @@
 # bumblebee-catalog
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/rknightion/bumblebee-catalog/badge)](https://scorecard.dev/viewer/?uri=github.com/rknightion/bumblebee-catalog)
+
 Rolling **OSV exposure catalog** for [Bumblebee](https://github.com/perplexityai/bumblebee),
 generated every 4 hours from the [OSSF malicious-packages](https://github.com/ossf/malicious-packages)
 feed and published as a release asset that managed endpoints fetch before each scan.
