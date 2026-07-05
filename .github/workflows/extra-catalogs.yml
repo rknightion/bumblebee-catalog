@@ -1,0 +1,170 @@
+name: Generate extra exposure catalogs
+
+# Builds two additional Bumblebee exposure catalogs and publishes them as
+# assets on the same rolling `catalog-latest` release that endpoints already
+# fetch alongside osv-malicious.json:
+#
+#   * datadog-malicious.json — DataDog malicious-software-packages-dataset
+#     (Apache-2.0). Additive to the OSSF feed (OSSF does not ingest it) and
+#     the only public source here that covers editor extensions. npm/pypi
+#     "all-versions" (null) records are dropped since v0.1 matches exact
+#     versions only; see ci/datadog_catalog.py.
+#   * ghsa-malicious.json — GitHub Advisory Database CWE-506 malware
+#     advisories (CC-BY-4.0). Strictly additive to osv-malicious.json:
+#     advisories that already alias an OSSF MAL- id are skipped, so this
+#     fills the gap bumblebee's own osvcatalog importer cannot (it only
+#     treats MAL- ids as malicious). See ci/ghsa_catalog.py.
+#
+# Cadence: daily. Both upstreams update roughly daily and neither is as
+# time-sensitive as the 4h OSSF feed.
+
+on:
+  schedule:
+    - cron: '30 5 * * *'
+  workflow_dispatch:
+    inputs:
+      force_publish:
+        description: 'Publish even if entry count drops >10% vs last-good'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write          # create/update the catalog-latest release
+
+concurrency:
+  group: extra-catalogs
+  cancel-in-progress: false
+
+env:
+  BUMBLEBEE_REPO: perplexityai/bumblebee
+  # Same pin as osv-catalog.yml — keep schema_version (0.1.0) in sync with
+  # the deployed binary; the self-test builds this exact commit.
+  BUMBLEBEE_SHA: 156df7a272c9fc6bdd74df04fdabbf99477214de
+  DATADOG_REPO: https://github.com/DataDog/malicious-software-packages-dataset
+  GHSA_REPO: https://github.com/github/advisory-database
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo (CI scripts)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout bumblebee (pinned)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+          repository: ${{ env.BUMBLEBEE_REPO }}
+          ref: ${{ env.BUMBLEBEE_SHA }}
+          path: bumblebee
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: bumblebee/go.mod
+
+      - name: Build bumblebee (for the positive-match self-test)
+        working-directory: bumblebee
+        run: go build -o "$GITHUB_WORKSPACE/bin/bumblebee" ./cmd/bumblebee
+
+      # ---- DataDog malicious-software-packages-dataset ----
+      - name: Fetch DataDog dataset manifests (pinned commit)
+        run: |
+          set -euo pipefail
+          DD_SHA=$(git ls-remote "$DATADOG_REPO" HEAD | cut -f1)
+          echo "DD_SHA=$DD_SHA" >> "$GITHUB_ENV"
+          base="https://raw.githubusercontent.com/DataDog/malicious-software-packages-dataset/${DD_SHA}/samples"
+          for eco in npm pypi ide_extensions; do
+            mkdir -p "dd/samples/$eco"
+            curl -fsSL "$base/$eco/manifest.json" -o "dd/samples/$eco/manifest.json"
+          done
+
+      - name: Generate datadog-malicious.json
+        run: |
+          set -euo pipefail
+          python3 ci/datadog_catalog.py \
+            --samples dd/samples \
+            --source "${DATADOG_REPO}@${DD_SHA}" \
+            --out datadog-malicious.json
+
+      # ---- GitHub Advisory Database (CWE-506 malware) ----
+      - name: Clone GitHub Advisory Database (shallow)
+        run: |
+          set -euo pipefail
+          git clone --depth 1 "$GHSA_REPO" ghsa
+          echo "GHSA_SHA=$(git -C ghsa rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Generate ghsa-malicious.json
+        run: |
+          set -euo pipefail
+          python3 ci/ghsa_catalog.py \
+            --advisories ghsa/advisories/github-reviewed \
+            --source "${GHSA_REPO}@${GHSA_SHA}" \
+            --out ghsa-malicious.json
+
+      # ---- Floor check vs last-good ----
+      - name: Download last-good catalogs (floor check)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p old
+          gh release download catalog-latest --repo "$GITHUB_REPOSITORY" \
+            -p datadog-malicious.json -D old || echo "no previous datadog asset"
+          gh release download catalog-latest --repo "$GITHUB_REPOSITORY" \
+            -p ghsa-malicious.json -D old || echo "no previous ghsa asset"
+
+      - name: Validate + write meta
+        # force_publish is passed via env (not interpolated into the script)
+        # to avoid github-context expression injection into the run block.
+        env:
+          FORCE_PUBLISH: ${{ github.event.inputs.force_publish }}
+        run: |
+          set -euo pipefail
+          force=()
+          if [ "${FORCE_PUBLISH:-false}" = "true" ]; then force=(--force); fi
+          python3 ci/validate.py \
+            --catalog datadog-malicious.json --old old/datadog-malicious.json \
+            --meta-out datadog-meta.json --label datadog \
+            --bumblebee-sha "$BUMBLEBEE_SHA" \
+            --provenance "source=${DATADOG_REPO}@${DD_SHA}" \
+            "${force[@]}"
+          python3 ci/validate.py \
+            --catalog ghsa-malicious.json --old old/ghsa-malicious.json \
+            --meta-out ghsa-meta.json --label ghsa \
+            --bumblebee-sha "$BUMBLEBEE_SHA" \
+            --provenance "source=${GHSA_REPO}@${GHSA_SHA}" \
+            "${force[@]}"
+
+      - name: Positive-match self-test (each catalog actually matches)
+        run: |
+          set -euo pipefail
+          for cat in datadog-malicious.json ghsa-malicious.json; do
+            PKGVER=$(python3 ci/make_fixture.py --catalog "$cat" --out "fixture-$cat")
+            echo "seeded $cat: $PKGVER"
+            "$GITHUB_WORKSPACE/bin/bumblebee" scan \
+              --profile project --root "fixture-$cat" \
+              --exposure-catalog "$cat" \
+              --max-duration 2m \
+              --output file --output-file "scan-$cat.ndjson"
+            python3 ci/assert_finding.py --ndjson "scan-$cat.ndjson" \
+              --seed-file "fixture-$cat/seed.json"
+          done
+
+      - name: Publish catalog-latest release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh release view catalog-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create catalog-latest --repo "$GITHUB_REPOSITORY" \
+              --latest --title "OSV exposure catalog (rolling)" \
+              --notes "Auto-generated rolling Bumblebee exposure catalogs. The tag is a moving pointer; see each *-meta.json for provenance (generated_at, source, entry_count)."
+          fi
+          gh release upload catalog-latest --repo "$GITHUB_REPOSITORY" --clobber \
+            datadog-malicious.json datadog-meta.json \
+            ghsa-malicious.json ghsa-meta.json
+          echo "Published datadog-malicious.json ($(python3 -c "import json;print(len(json.load(open('datadog-malicious.json'))['entries']))") entries)"
+          echo "Published ghsa-malicious.json ($(python3 -c "import json;print(len(json.load(open('ghsa-malicious.json'))['entries']))") entries)"
