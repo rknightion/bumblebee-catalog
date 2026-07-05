@@ -25,6 +25,14 @@ def main():
     ap.add_argument("--old", default="")
     ap.add_argument("--ossf-sha", default="")
     ap.add_argument("--bumblebee-sha", default="")
+    ap.add_argument("--meta-out", default="catalog-meta.json",
+                    help="path to write the freshness/provenance metadata")
+    ap.add_argument("--label", default="",
+                    help="human label identifying which catalog this is")
+    ap.add_argument("--provenance", action="append", default=[],
+                    metavar="KEY=VALUE",
+                    help="extra provenance pairs to stamp into the metadata "
+                         "(repeatable)")
     ap.add_argument("--force", action="store_true")
     a = ap.parse_args()
 
@@ -63,9 +71,17 @@ def main():
         "ossf_sha": a.ossf_sha,
         "bumblebee_sha": a.bumblebee_sha,
     }
-    with open("catalog-meta.json", "w") as f:
+    if a.label:
+        meta["catalog"] = a.label
+    for pair in a.provenance:
+        key, sep, value = pair.partition("=")
+        if not sep:
+            sys.exit(f"FAIL: --provenance expects KEY=VALUE, got {pair!r}")
+        meta[key.strip()] = value.strip()
+    with open(a.meta_out, "w") as f:
         json.dump(meta, f, indent=2)
-    print(f"OK: {n} entries (prev {old_n}), schema {sv}")
+    print(f"OK: {n} entries (prev {old_n}), schema {sv}"
+          + (f" [{a.label}]" if a.label else ""))
 
 
 if __name__ == "__main__":
