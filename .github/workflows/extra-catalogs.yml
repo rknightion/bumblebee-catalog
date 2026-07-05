@@ -117,20 +117,26 @@ jobs:
             -p ghsa-malicious.json -D old || echo "no previous ghsa asset"
 
       - name: Validate + write meta
+        # force_publish is passed via env (not interpolated into the script)
+        # to avoid github-context expression injection into the run block.
+        env:
+          FORCE_PUBLISH: ${{ github.event.inputs.force_publish }}
         run: |
           set -euo pipefail
+          force=()
+          if [ "${FORCE_PUBLISH:-false}" = "true" ]; then force=(--force); fi
           python3 ci/validate.py \
             --catalog datadog-malicious.json --old old/datadog-malicious.json \
             --meta-out datadog-meta.json --label datadog \
             --bumblebee-sha "$BUMBLEBEE_SHA" \
             --provenance "source=${DATADOG_REPO}@${DD_SHA}" \
-            ${{ github.event.inputs.force_publish == 'true' && '--force' || '' }}
+            "${force[@]}"
           python3 ci/validate.py \
             --catalog ghsa-malicious.json --old old/ghsa-malicious.json \
             --meta-out ghsa-meta.json --label ghsa \
             --bumblebee-sha "$BUMBLEBEE_SHA" \
             --provenance "source=${GHSA_REPO}@${GHSA_SHA}" \
-            ${{ github.event.inputs.force_publish == 'true' && '--force' || '' }}
+            "${force[@]}"
 
       - name: Positive-match self-test (each catalog actually matches)
         run: |
