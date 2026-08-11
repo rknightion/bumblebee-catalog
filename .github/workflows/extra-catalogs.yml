@@ -40,6 +40,14 @@ env:
   # Same pin as osv-catalog.yml — keep schema_version (0.1.0) in sync with
   # the deployed binary; the self-test builds this exact commit.
   BUMBLEBEE_SHA: 156df7a272c9fc6bdd74df04fdabbf99477214de
+  # The RELEASE the fleet runs. All acceptance validation happens against this,
+  # not the main checkout above: v0.1.2 accepts only schema 0.1.0 while main
+  # accepts 0.1.0 and 0.2.0. Keep in step with BUMBLEBEE_VERSION in the
+  # bumblebee-intune installer.
+  BUMBLEBEE_RELEASE: 0.1.2
+  # NOT a free choice -- see the docstring in ci/validate.py. Raising this ahead
+  # of the deployed binary silently drops every catalog here from every scan.
+  CATALOG_SCHEMA_VERSION: 0.1.0
   DATADOG_REPO: https://github.com/DataDog/malicious-software-packages-dataset
   GHSA_REPO: https://github.com/github/advisory-database
 
@@ -65,9 +73,21 @@ jobs:
         with:
           go-version-file: bumblebee/go.mod
 
-      - name: Build bumblebee (for the positive-match self-test)
+      - name: Build bumblebee (generator only)
         working-directory: bumblebee
         run: go build -o "$GITHUB_WORKSPACE/bin/bumblebee" ./cmd/bumblebee
+
+      - name: Download the DEPLOYED release (validation target)
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          base="https://github.com/${BUMBLEBEE_REPO}/releases/download/v${BUMBLEBEE_RELEASE}"
+          tarball="bumblebee_${BUMBLEBEE_RELEASE}_linux_amd64.tar.gz"
+          curl -fsSL "$base/$tarball" -o "release/$tarball"
+          curl -fsSL "$base/checksums.txt" -o release/checksums.txt
+          ( cd release && grep " ${tarball}\$" checksums.txt | sha256sum -c - )
+          tar -xzf "release/$tarball" -C release
+          release/bumblebee version
 
       # ---- DataDog malicious-software-packages-dataset ----
       - name: Fetch DataDog dataset manifests (pinned commit)
@@ -129,12 +149,14 @@ jobs:
             --catalog datadog-malicious.json --old old/datadog-malicious.json \
             --meta-out datadog-meta.json --label datadog \
             --bumblebee-sha "$BUMBLEBEE_SHA" \
+            --target-schema "$CATALOG_SCHEMA_VERSION" \
             --provenance "source=${DATADOG_REPO}@${DD_SHA}" \
             "${force[@]}"
           python3 ci/validate.py \
             --catalog ghsa-malicious.json --old old/ghsa-malicious.json \
             --meta-out ghsa-meta.json --label ghsa \
             --bumblebee-sha "$BUMBLEBEE_SHA" \
+            --target-schema "$CATALOG_SCHEMA_VERSION" \
             --provenance "source=${GHSA_REPO}@${GHSA_SHA}" \
             "${force[@]}"
 
@@ -144,7 +166,7 @@ jobs:
           for cat in datadog-malicious.json ghsa-malicious.json; do
             PKGVER=$(python3 ci/make_fixture.py --catalog "$cat" --out "fixture-$cat")
             echo "seeded $cat: $PKGVER"
-            "$GITHUB_WORKSPACE/bin/bumblebee" scan \
+            release/bumblebee scan \
               --profile project --root "fixture-$cat" \
               --exposure-catalog "$cat" \
               --max-duration 2m \
@@ -152,6 +174,22 @@ jobs:
             python3 ci/assert_finding.py --ndjson "scan-$cat.ndjson" \
               --seed-file "fixture-$cat/seed.json"
           done
+
+      - name: Assert the catalog SET loads in the deployed binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # These two ship alongside osv-malicious.json and the binary's own
+          # bundled threat_intel in ONE directory on every endpoint, and
+          # bumblebee exits 2 on a schema-mixed directory with no records at
+          # all. Prove the real combination loads before publishing.
+          gh release download catalog-latest --repo "$GITHUB_REPOSITORY" \
+            -p 'osv-malicious.json' -D peers || true
+          args=(--binary release/bumblebee --bundled release/threat_intel \
+                --catalog datadog-malicious.json --catalog ghsa-malicious.json)
+          [ -f peers/osv-malicious.json ] && args+=(--catalog peers/osv-malicious.json)
+          python3 ci/assert_catalog_set.py "${args[@]}"
 
       - name: Publish catalog-latest release assets
         env:

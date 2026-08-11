@@ -1,17 +1,40 @@
 #!/usr/bin/env python3
-"""Validate a generated OSV exposure catalog and emit catalog-meta.json.
+"""Validate a generated exposure catalog and emit its *-meta.json.
 
-Checks: parses as JSON, schema_version == 0.1.0, entries is a non-empty list,
-and (unless --force) the entry count hasn't dropped >10% vs the last-good
-catalog. Writes catalog-meta.json (generated_at + provenance) which endpoints
-fetch for a catalog-freshness dead-man's switch.
+Checks: parses as JSON, schema_version matches the target, entries is a
+non-empty list, and (unless --force) the entry count hasn't dropped >10% vs
+the last-good catalog. Writes the meta file (generated_at + provenance) which
+endpoints fetch for a catalog-freshness dead-man's switch.
+
+WHY THE SCHEMA VERSION IS LOAD-BEARING
+--------------------------------------
+Endpoints point `--exposure-catalog` at a DIRECTORY holding every catalog:
+the binary's own bundled `threat_intel/*.json` plus each asset published here.
+bumblebee's directory loader requires every file in that directory to declare
+the SAME schema_version, and a mismatch is fatal -- it exits 2 BEFORE scanning,
+emitting no records at all, not even a scan_summary. There is nothing left to
+alert on.
+
+So the version this repo publishes is not a free choice. It must equal the
+schema the DEPLOYED binary ships and accepts:
+
+  * v0.1.2 (the current release, and what the fleet runs) supports ONLY
+    "0.1.0" and hard-rejects "0.2.0" with
+    `unsupported exposure catalog schema_version "0.2.0"`.
+  * bumblebee `main` has moved to "0.2.0" (adds any-version "*" entries) and
+    its bundled threat_intel catalogs are already bumped, but no release
+    carries it yet.
+
+Therefore: do NOT bump --target-schema ahead of the endpoints. The order is
+(1) a bumblebee release supporting the new schema exists, (2) the deployment's
+pinned BUMBLEBEE_VERSION is raised to it and has rolled out, (3) only then
+bump here. Bumping here first silently drops this repo's catalogs from every
+endpoint's scan.
 """
 import argparse
 import json
 import sys
 from datetime import datetime, timezone
-
-EXPECTED_SCHEMA = "0.1.0"
 
 
 def load(path):
@@ -33,6 +56,9 @@ def main():
                     metavar="KEY=VALUE",
                     help="extra provenance pairs to stamp into the metadata "
                          "(repeatable)")
+    ap.add_argument("--target-schema", default="0.1.0",
+                    help="schema_version the DEPLOYED binary supports; the catalog must "
+                         "declare exactly this (see module docstring before changing it)")
     ap.add_argument("--force", action="store_true")
     a = ap.parse_args()
 
@@ -42,9 +68,12 @@ def main():
         sys.exit(f"FAIL: catalog does not parse as JSON: {e}")
 
     sv = cat.get("schema_version")
-    if sv != EXPECTED_SCHEMA:
-        sys.exit(f"FAIL: schema_version={sv!r}, expected {EXPECTED_SCHEMA!r} "
-                 "(deployed binary would fail-closed on a mismatched catalog)")
+    if sv != a.target_schema:
+        sys.exit(f"FAIL: schema_version={sv!r}, expected {a.target_schema!r}. "
+                 "Endpoints load every catalog from ONE directory and bumblebee refuses a "
+                 "directory that mixes schema versions -- it exits 2 before scanning, with no "
+                 "records and nothing to alert on. Publishing this would silently disable "
+                 "detection fleet-wide.")
 
     entries = cat.get("entries")
     if not isinstance(entries, list) or not entries:

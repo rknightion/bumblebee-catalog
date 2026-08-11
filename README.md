@@ -20,10 +20,48 @@ secrets, no private data.
 | GHSA malware catalog (additive to OSSF) | `https://github.com/rknightion/bumblebee-catalog/releases/latest/download/ghsa-malicious.json` |
 | GHSA provenance / freshness | `https://github.com/rknightion/bumblebee-catalog/releases/latest/download/ghsa-meta.json` |
 
-Endpoints combine these catalogs with the brew-bundled curated `threat_intel/*.json`
+Endpoints combine these catalogs with the binary's bundled curated `threat_intel/*.json`
 catalogs in a single `--exposure-catalog` directory — Bumblebee loads every catalog
 in the directory and matches against the union. Each `*-meta.json` carries
 `generated_at` for a catalog-freshness dead-man's switch (alert if stale).
+
+## ⚠️ `schema_version` is coupled to the deployed binary — do not bump it here first
+
+Bumblebee's directory loader requires **every** catalog in the directory to declare the
+**same** `schema_version`. A mismatch is not a warning and not a partial load: it
+**exits 2 before the scan starts**, emitting no packages, no findings, and no
+`scan_summary`. The run is completely silent, so no freshness or finding alert can fire —
+detection is simply off while everything else still looks green.
+
+That makes the version this repo publishes a deployment-coupled decision, not a free one:
+
+| | schema accepted |
+|---|---|
+| **v0.1.2** — the current release, and what the fleet runs | `0.1.0` only. Hard-rejects `0.2.0`. |
+| bumblebee `main` — bundled catalogs already bumped, unreleased | `0.1.0` and `0.2.0` |
+
+**Bumping `CATALOG_SCHEMA_VERSION` here before endpoints run a binary that accepts it
+silently drops every catalog in this repo from every scan.** The safe order is:
+
+1. A bumblebee **release** supporting the new schema exists.
+2. The deployment's pinned `BUMBLEBEE_VERSION` is raised to it *and has rolled out*.
+3. Only then bump `CATALOG_SCHEMA_VERSION` in both workflows.
+
+Two CI guards enforce this so it cannot happen by accident:
+
+- `ci/validate.py --target-schema` fails the build if a generated catalog declares
+  anything other than the configured version.
+- **`ci/assert_catalog_set.py`** downloads the **released** binary (`BUMBLEBEE_RELEASE`),
+  assembles the real directory — every asset this repo publishes *plus* the binary's own
+  bundled `threat_intel` — and runs a real scan against it. This is the only check that can
+  catch a bad set, because each file is individually valid and only the *combination* is
+  illegal.
+
+Note the deliberate split: `BUMBLEBEE_SHA` pins a `main` commit used **only** to build the
+`osvcatalog` generator (which postdates the v0.1.1 tag), while `BUMBLEBEE_RELEASE` pins the
+released binary used for **all acceptance validation**. Validating against `main` was the
+original gap — `main` accepts catalogs the deployed binary rejects, so CI could go green
+while every endpoint silently stopped detecting.
 
 ## Additional catalogs (`.github/workflows/extra-catalogs.yml`)
 

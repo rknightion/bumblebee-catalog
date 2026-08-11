@@ -26,8 +26,18 @@ concurrency:
 env:
   BUMBLEBEE_REPO: perplexityai/bumblebee
   # Pinned: tools/osvcatalog was added AFTER the v0.1.1 tag, so we pin a commit
-  # that contains it. Keep schema_version (0.1.0) in sync with the deployed binary.
+  # that contains it. This builds the GENERATOR only.
   BUMBLEBEE_SHA: 156df7a272c9fc6bdd74df04fdabbf99477214de
+  # The RELEASE the fleet actually runs. Validation happens against THIS, not
+  # against a main checkout: v0.1.2 accepts only schema 0.1.0 while main accepts
+  # 0.1.0 and 0.2.0, so a catalog main loads happily can be rejected outright by
+  # the deployed binary. Keep in step with BUMBLEBEE_VERSION in the
+  # bumblebee-intune installer.
+  BUMBLEBEE_RELEASE: 0.1.2
+  # The schema_version endpoints can consume. NOT a free choice -- read the
+  # docstring in ci/validate.py before touching it. Raising this ahead of the
+  # deployed binary silently drops every catalog here from every scan.
+  CATALOG_SCHEMA_VERSION: 0.1.0
   OUTPUT: osv-malicious.json
 
 jobs:
@@ -52,9 +62,23 @@ jobs:
         with:
           go-version-file: bumblebee/go.mod
 
-      - name: Build bumblebee (for the positive-match self-test)
+      - name: Build bumblebee (generator only)
         working-directory: bumblebee
         run: go build -o "$GITHUB_WORKSPACE/bin/bumblebee" ./cmd/bumblebee
+
+      - name: Download the DEPLOYED release (validation target)
+        run: |
+          set -euo pipefail
+          # Everything that decides "will endpoints accept this catalog" must be
+          # answered by the binary the fleet actually runs, not by main.
+          mkdir -p release
+          base="https://github.com/${BUMBLEBEE_REPO}/releases/download/v${BUMBLEBEE_RELEASE}"
+          tarball="bumblebee_${BUMBLEBEE_RELEASE}_linux_amd64.tar.gz"
+          curl -fsSL "$base/$tarball" -o "release/$tarball"
+          curl -fsSL "$base/checksums.txt" -o release/checksums.txt
+          ( cd release && grep " ${tarball}\$" checksums.txt | sha256sum -c - )
+          tar -xzf "release/$tarball" -C release
+          release/bumblebee version
 
       - name: Sparse-checkout OSSF malicious-packages
         run: |
@@ -85,21 +109,48 @@ jobs:
             -p "$OUTPUT" -D old || echo "no previous release yet"
 
       - name: Validate + write meta
+        # force_publish goes via env rather than being interpolated into the
+        # run block, matching extra-catalogs.yml (commit 304929c). Same
+        # github-context-injection hygiene, applied here too.
+        env:
+          FORCE_PUBLISH: ${{ github.event.inputs.force_publish }}
         run: |
           set -euo pipefail
+          force=()
+          if [ "${FORCE_PUBLISH:-false}" = "true" ]; then force=(--force); fi
           python3 ci/validate.py \
             --catalog "$OUTPUT" \
             --old "old/$OUTPUT" \
             --ossf-sha "$OSSF_SHA" \
             --bumblebee-sha "$BUMBLEBEE_SHA" \
-            ${{ github.event.inputs.force_publish == 'true' && '--force' || '' }}
+            --target-schema "$CATALOG_SCHEMA_VERSION" \
+            "${force[@]}"
+
+      - name: Assert the catalog SET loads in the deployed binary
+        run: |
+          set -euo pipefail
+          # The published assets are consumed together with the binary's own
+          # bundled threat_intel in ONE directory, and bumblebee exits 2 on a
+          # directory that mixes schema versions -- emitting no records at all,
+          # so nothing downstream can alert. Prove the real combination loads.
+          gh release download catalog-latest --repo "$GITHUB_REPOSITORY" \
+            -p 'datadog-malicious.json' -p 'ghsa-malicious.json' -D peers || true
+          args=(--binary release/bumblebee --bundled release/threat_intel --catalog "$OUTPUT")
+          for p in peers/datadog-malicious.json peers/ghsa-malicious.json; do
+            [ -f "$p" ] && args+=(--catalog "$p")
+          done
+          python3 ci/assert_catalog_set.py "${args[@]}"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Positive-match self-test (catalog actually matches)
         run: |
           set -euo pipefail
           PKGVER=$(python3 ci/make_fixture.py --catalog "$OUTPUT" --out fixture)
           echo "seeded fixture package: $PKGVER"
-          "$GITHUB_WORKSPACE/bin/bumblebee" scan \
+          # Match against the DEPLOYED release, not the main-commit build used
+          # to generate the catalog. "main can match it" is not the question.
+          release/bumblebee scan \
             --profile project --root fixture \
             --exposure-catalog "$OUTPUT" \
             --max-duration 2m \
