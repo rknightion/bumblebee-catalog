@@ -87,7 +87,7 @@ profile.
   accident.
 - **Never use `--notes` or `--plan` bare** — they *silently replace* the whole section, destroying
   another session's writes with no warning and exit 0. Use `--append-notes` and `--append-plan`.
-  `.claude/hooks/backlog-guard.py` denies the bare forms rather than trusting anyone to remember.
+  a global `PreToolUse` hook in the agent config denies the bare forms rather than trusting anyone to remember.
 - **Finalize in one call**, so an interrupted run cannot leave finished work looking unfinished:
   `backlog task edit BBC-0001 --check-ac 1 --check-ac 2 -s Done`. Checking criteria at one step and
   setting status several steps later leaves the task inconsistent if anything interrupts between.
