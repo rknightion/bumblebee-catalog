@@ -3,7 +3,7 @@ id: BBC-0001
 title: >-
   Bump CATALOG_SCHEMA_VERSION to 0.2.0 once the fleet runs a binary that accepts
   it
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-14 16:37'
 labels:
