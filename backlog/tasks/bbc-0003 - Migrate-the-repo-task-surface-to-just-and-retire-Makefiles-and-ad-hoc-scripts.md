@@ -1,10 +1,10 @@
 ---
 id: BBC-0003
 title: Migrate the repo task surface to just and retire Makefiles and ad-hoc scripts
-status: In Progress
+status: Parked
 assignee: []
 created_date: '2026-08-28 19:14'
-updated_date: '2026-08-29 13:26'
+updated_date: '2026-08-29 13:32'
 labels:
   - 'wave:2-fleet'
 dependencies: []
@@ -469,23 +469,23 @@ runs on push/PR.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Top-level justfile exists implementing all seven mandatory recipes: default, setup, fmt, fmt-check, lint, test, check
-- [ ] #2 just check passes locally and runs exactly what ci.yml enforces (fmt-check, lint via py_compile, test no-op)
-- [ ] #3 just --fmt --check passes against the committed justfile
-- [ ] #4 just --list shows a # doc comment and a [group(...)] for every public recipe, including gen-datadog-catalog, gen-ghsa-catalog, validate-catalog, make-fixture, assert-finding, assert-catalog-set, and lint-workflows
-- [ ] #5 Each of the six ci/*.py scripts (assert_catalog_set.py, assert_finding.py, datadog_catalog.py, ghsa_catalog.py, make_fixture.py, validate.py) is reachable only via its wrapping just recipe from ci.yml, osv-catalog.yml, and extra-catalogs.yml
-- [ ] #6 ci.yml, osv-catalog.yml, and extra-catalogs.yml invoke just recipes in place of the former python3 ci/*.py and python3 -m py_compile calls, with an extractions/setup-just step added before first use, and the ci-success job, concurrency groups, and permissions blocks unchanged
-- [ ] #7 actionlint.yml, codeql.yml, dependency-review.yml, keepalive.yml, scorecard.yml, and zizmor.yml are unmodified
-- [ ] #8 AGENTS.md has a Task interface section per the fleet standard and no longer states that ci.yml runs a bare python3 -m py_compile command
-- [ ] #9 backlog/config.yml's definition_of_done names just check and just lint-workflows instead of python3 -m py_compile / actionlint / zizmor
+- [x] #1 Top-level justfile exists implementing all seven mandatory recipes: default, setup, fmt, fmt-check, lint, test, check
+- [x] #2 just check passes locally and runs exactly what ci.yml enforces (fmt-check, lint via py_compile, test no-op)
+- [x] #3 just --fmt --check passes against the committed justfile
+- [x] #4 just --list shows a # doc comment and a [group(...)] for every public recipe, including gen-datadog-catalog, gen-ghsa-catalog, validate-catalog, make-fixture, assert-finding, assert-catalog-set, and lint-workflows
+- [x] #5 Each of the six ci/*.py scripts (assert_catalog_set.py, assert_finding.py, datadog_catalog.py, ghsa_catalog.py, make_fixture.py, validate.py) is reachable only via its wrapping just recipe from ci.yml, osv-catalog.yml, and extra-catalogs.yml
+- [x] #6 ci.yml, osv-catalog.yml, and extra-catalogs.yml invoke just recipes in place of the former python3 ci/*.py and python3 -m py_compile calls, with an extractions/setup-just step added before first use, and the ci-success job, concurrency groups, and permissions blocks unchanged
+- [x] #7 actionlint.yml, codeql.yml, dependency-review.yml, keepalive.yml, scorecard.yml, and zizmor.yml are unmodified
+- [x] #8 AGENTS.md has a Task interface section per the fleet standard and no longer states that ci.yml runs a bare python3 -m py_compile command
+- [x] #9 backlog/config.yml's definition_of_done names just check and just lint-workflows instead of python3 -m py_compile / actionlint / zizmor
 - [ ] #10 A workflow_dispatch run of osv-catalog.yml and, separately, extra-catalogs.yml completes successfully after the migration, confirming the just-wrapped script invocations behave identically to the originals
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 python3 -m py_compile ci/*.py
-- [ ] #2 actionlint (only if a .github/workflows file changed)
-- [ ] #3 zizmor .github/workflows/ (only if a .github/workflows file changed)
+- [x] #1 python3 -m py_compile ci/*.py
+- [x] #2 actionlint (only if a .github/workflows file changed)
+- [x] #3 zizmor .github/workflows/ (only if a .github/workflows file changed)
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -501,6 +501,8 @@ runs on push/PR.
 
 <!-- SECTION:NOTES:BEGIN -->
 Preflight: main is clean and matches origin/main at 45aa682871deca261882c82db41a3959879bc748; origin points at rknightion/bumblebee-catalog. Public REST identity lookup returned HTTP 403 without authentication, and no login will be attempted. No tracked Makefile, task-shell script, or hook surface is present.
+
+Validation: just --fmt --check, just --dump --dump-format json, just check, all six wrapper recipes with --help, actionlint, and zizmor completed successfully. The push CI run 33255172264 completed successfully at 87a96be71f4b11ed13cfc50900c48255c6573064. Zizmor reported one pre-existing warning in untouched keepalive.yml; it exited 0. No tracked hook surface or configured hooks path exists. CodeRabbit was skipped under policy: the diff is declarative CI/configuration wiring with no changed branching logic.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -546,3 +548,9 @@ Eleven of the 42 lanes arrived at this shape independently before it was ratifie
 **If this repo has no such legs, it has no `ci` recipe at all** and `check` is the whole gate. Do not add an empty one.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Migrated the task surface to just in 87a96be71f4b11ed13cfc50900c48255c6573064: added the seven mandatory recipes and six wrapper recipes; rewired the three specified workflows through SHA-pinned setup-just; documented the interface; and updated the definition of done. Verified local gates and successful CI run 33255172264 at that SHA. Parked solely because acceptance criterion 10 needs authenticated, sequential workflow_dispatch runs for osv-catalog.yml and extra-catalogs.yml; this lane has no GitHub API authentication and must not log in. Resume by checking no catalog run is active, dispatching osv-catalog.yml and confirming success/release assets, then dispatching extra-catalogs.yml separately and confirming success/release assets.
+<!-- SECTION:FINAL_SUMMARY:END -->
