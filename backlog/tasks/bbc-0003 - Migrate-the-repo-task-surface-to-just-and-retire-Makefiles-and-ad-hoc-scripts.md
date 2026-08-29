@@ -1,10 +1,10 @@
 ---
 id: BBC-0003
 title: Migrate the repo task surface to just and retire Makefiles and ad-hoc scripts
-status: Parked
+status: Done
 assignee: []
 created_date: '2026-08-28 19:14'
-updated_date: '2026-08-29 13:32'
+updated_date: '2026-08-29 18:18'
 labels:
   - 'wave:2-fleet'
 dependencies: []
@@ -503,6 +503,8 @@ runs on push/PR.
 Preflight: main is clean and matches origin/main at 45aa682871deca261882c82db41a3959879bc748; origin points at rknightion/bumblebee-catalog. Public REST identity lookup returned HTTP 403 without authentication, and no login will be attempted. No tracked Makefile, task-shell script, or hook surface is present.
 
 Validation: just --fmt --check, just --dump --dump-format json, just check, all six wrapper recipes with --help, actionlint, and zizmor completed successfully. The push CI run 33255172264 completed successfully at 87a96be71f4b11ed13cfc50900c48255c6573064. Zizmor reported one pre-existing warning in untouched keepalive.yml; it exited 0. No tracked hook surface or configured hooks path exists. CodeRabbit was skipped under policy: the diff is declarative CI/configuration wiring with no changed branching logic.
+
+Unparked and completed 2026-08-29. Both publishers proven at this head: the scheduled OSV catalog run succeeded, and a dispatched extra-catalogs run also succeeded. Migration at 45c66a6; exact-head CI green.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
