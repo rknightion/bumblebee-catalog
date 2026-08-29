@@ -1,10 +1,10 @@
 ---
 id: BBC-0003
 title: Migrate the repo task surface to just and retire Makefiles and ad-hoc scripts
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-28 19:14'
-updated_date: '2026-08-29 10:42'
+updated_date: '2026-08-29 13:26'
 labels:
   - 'wave:2-fleet'
 dependencies: []
@@ -487,6 +487,21 @@ runs on push/PR.
 - [ ] #2 actionlint (only if a .github/workflows file changed)
 - [ ] #3 zizmor .github/workflows/ (only if a .github/workflows file changed)
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add and format the top-level justfile with the seven mandatory recipes plus the six real-program wrappers; omit a `ci` recipe because this GitHub-hosted repo has no Docker, service-container, or cross-compilation leg (fleet goal §6.2 supersedes the task’s earlier `ci: check lint-workflows` proposal).
+2. Rewire only the specified Python invocation lines in ci.yml, osv-catalog.yml, and extra-catalogs.yml, adding the SHA-pinned setup-just action before first use while preserving all orchestration, pins, concurrency, permissions, and reusable-workflow callers.
+3. Update AGENTS.md and backlog/config.yml to make `just` the documented task surface and definition-of-done gate.
+4. Validate formatting, recipe discovery/dump, argument passthrough, check, workflow lint/security audit, hook surfaces, removed-name searches, diff invariants, and the final pushed CI run; finalize atomically with the evidence.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Preflight: main is clean and matches origin/main at 45aa682871deca261882c82db41a3959879bc748; origin points at rknightion/bumblebee-catalog. Public REST identity lookup returned HTTP 403 without authentication, and no login will be attempted. No tracked Makefile, task-shell script, or hook surface is present.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

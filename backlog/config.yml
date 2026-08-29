@@ -2,9 +2,8 @@ project_name: "bumblebee-catalog"
 default_status: "To Do"
 statuses: ["To Do", "In Progress", "Parked", "Done"]
 definition_of_done:
-  - "python3 -m py_compile ci/*.py"
-  - "actionlint (only if a .github/workflows file changed)"
-  - "zizmor .github/workflows/ (only if a .github/workflows file changed)"
+  - "just check"
+  - "just lint-workflows (only if a .github/workflows file changed)"
 labels: []
 date_format: yyyy-mm-dd
 max_column_width: 20

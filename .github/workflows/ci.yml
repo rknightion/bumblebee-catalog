@@ -22,8 +22,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Syntax-check CI scripts
-        run: python3 -m py_compile ci/*.py
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: '1.58.0'
+      - name: Run the check gate
+        run: just check
   ci-success:
     name: ci-success
     runs-on: ubuntu-latest

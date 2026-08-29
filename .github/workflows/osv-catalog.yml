@@ -49,6 +49,10 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: '1.58.0'
+
       - name: Checkout bumblebee (pinned)
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -118,7 +122,7 @@ jobs:
           set -euo pipefail
           force=()
           if [ "${FORCE_PUBLISH:-false}" = "true" ]; then force=(--force); fi
-          python3 ci/validate.py \
+          just validate-catalog \
             --catalog "$OUTPUT" \
             --old "old/$OUTPUT" \
             --ossf-sha "$OSSF_SHA" \
@@ -139,14 +143,14 @@ jobs:
           for p in peers/datadog-malicious.json peers/ghsa-malicious.json; do
             [ -f "$p" ] && args+=(--catalog "$p")
           done
-          python3 ci/assert_catalog_set.py "${args[@]}"
+          just assert-catalog-set "${args[@]}"
         env:
           GH_TOKEN: ${{ github.token }}
 
       - name: Positive-match self-test (catalog actually matches)
         run: |
           set -euo pipefail
-          PKGVER=$(python3 ci/make_fixture.py --catalog "$OUTPUT" --out fixture)
+          PKGVER=$(just make-fixture --catalog "$OUTPUT" --out fixture)
           echo "seeded fixture package: $PKGVER"
           # Match against the DEPLOYED release, not the main-commit build used
           # to generate the catalog. "main can match it" is not the question.
@@ -155,7 +159,7 @@ jobs:
             --exposure-catalog "$OUTPUT" \
             --max-duration 2m \
             --output file --output-file scan.ndjson
-          python3 ci/assert_finding.py --ndjson scan.ndjson --seed-file fixture/seed.json
+          just assert-finding --ndjson scan.ndjson --seed-file fixture/seed.json
 
       - name: Publish catalog-latest release asset
         env:

@@ -48,7 +48,7 @@ Renovate keeps them current, `zizmor` fails the build otherwise.
 
 ## Verifying a change
 
-`ci.yml` runs `python3 -m py_compile ci/*.py` and nothing else. It proves the scripts parse. It does
+`ci.yml` runs `just check` and nothing else. It proves the scripts parse. It does
 not run them, does not touch a catalog, and will not fail for most things a change can break. **"The
 gate passed" is a weak claim here.** Evidence, in rising order of strength:
 
@@ -59,6 +59,23 @@ gate passed" is a weak claim here.** Evidence, in rising order of strength:
    concurrency groups, so check the Actions tab first and never dispatch both at once.
 
 Say which level you actually reached.
+
+## Task interface
+
+This repo's task surface is a `justfile`. Discover it, don't guess it:
+
+    just --list                        # human-readable
+    just --dump --dump-format json     # machine-readable
+    just --show <recipe>               # what a recipe actually runs
+
+- `just check` is the full local gate and is exactly what `ci.yml` enforces. It must pass before you
+  commit.
+- Prefer `just <recipe>` over the underlying tool. If you are typing `python3 ci/validate.py`, you
+  want `just validate-catalog` instead.
+- Run `just` with stdin from /dev/null. This repo has no `[confirm]`-marked recipes today, but if one
+  is added later, stop and ask before running it — never pass `--yes` or `JUST_YES=1`.
+- If a task you need does not exist, add a recipe with a `#` doc comment and a `[group(...)]` rather
+  than running a bare command.
 
 ## Commits
 
