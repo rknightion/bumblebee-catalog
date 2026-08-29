@@ -17,6 +17,18 @@ name: Generate extra exposure catalogs
 #
 # Cadence: daily. Both upstreams update roughly daily and neither is as
 # time-sensitive as the 4h OSSF feed.
+#
+# This cron is COUPLED to the Grafana alert thresholds -- endpoints report
+# catalog_age_hours as the MAX across every source, so these two feeds set the
+# floor for any fleet-wide staleness alert:
+#   * BumblebeeCatalogStale     > 30h  -- all sources; must clear this daily
+#     cron plus GitHub's scheduled-workflow drift (25h gaps observed in Aug 2026).
+#   * BumblebeeOsvCatalogStale  > 18h  -- reads catalog_age_by_source.osv only,
+#     so the 4h OSSF feed keeps a tight bound without this one paging daily.
+# An 18h threshold on the max is unsatisfiable while this stays daily: it pages
+# for ~6h out of every 24 on any host that scans in the window. If you make this
+# cron more frequent, lower the 30h threshold to match; if you make it less
+# frequent, raise it first.
 
 on:
   schedule:
