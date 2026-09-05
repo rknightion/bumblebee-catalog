@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Product-specific additions to the central CodeRabbit defaults.
+# Keep inheritance enabled; shared review policy lives in the owner/coderabbit repository.
+inheritance: true
+reviews:
+  path_instructions:
+  - path: .github/workflows/osv-catalog.yml
+    instructions: >-
+      Treat catalog-latest assets as a deployed detection contract. Keep BUMBLEBEE_SHA, BUMBLEBEE_RELEASE
+      and CATALOG_SCHEMA_VERSION semantically distinct and synchronized with extra-catalogs.yml. Acceptance
+      must use the released fleet binary, while the pinned main SHA builds only the generator. Preserve
+      checksum verification, the last-good entry-count floor, false means for force_publish, and non-cancelling
+      publication semantics. Flag any path that can publish an empty, gutted, individually valid but set-incompatible
+      catalog.
+  - path: .github/workflows/extra-catalogs.yml
+    instructions: >-
+      Keep scanner pins and schema version synchronized with osv-catalog.yml. Check each upstream converter
+      against its actual source shape, preserve deduplication semantics and the greater-than-10-percent
+      last-good floor, and ensure all assets and metadata land on the same catalog-latest release without
+      racing the OSV publisher. Cron changes must remain compatible with the documented catalog-age alert
+      windows.
+  - path: ci/**
+    instructions: >-
+      A file can be individually valid while the catalog directory is unloadable. Preserve whole-set schema
+      assertions, nonempty entries, deterministic output, source provenance, and the distinction between
+      unavailable detection and a clean scan. Never weaken force/floor handling merely to make an upstream
+      feed regression pass.
+knowledge_base:
+  linked_repositories:
+  - repository: rknightion/bumblebee-intune
+    instructions: >-
+      Direct consumer. Check changed published interfaces and formats against the consumer-pinned version
+      and its actual use; identify the consumer update needed before changing a released contract.
