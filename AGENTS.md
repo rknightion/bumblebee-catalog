@@ -71,3 +71,23 @@ feels private, which is exactly why this breaks by accident.
 
 Read the **Agent fan-out protocol (canonical)** doc before designing a wave, and the **Wave operating
 model** doc for this project's own rules (`backlog doc view <id> --plain`).
+
+`Parked` is a real status, not a synonym for To Do: attempted, blocked, and left with a concrete
+resume boundary. Do not build on decisions and do not use the MCP surface - decisions are half-built
+upstream, so durable reference goes in docs and tasks stay the unit, and MCP is frozen upstream and
+costs 10-50k tokens of permanent context against 1-2k for the CLI.
+
+Backlog CLI traps, each of which loses data silently at exit 0:
+
+- **Never `--notes`, `--plan` or `--final-summary` bare.** Each REPLACES its whole section, wiping
+  another session's writes with no warning. Use `--append-notes`, `--append-plan`,
+  `--append-final-summary`. A hook in the agent config denies the bare forms.
+- **Never hand-edit task, draft, doc, decision or milestone markdown.** Section boundaries are
+  HTML-comment markers; break one and the section is dropped silently - still in the file, invisible
+  to the CLI, until the next write destroys it for real. There is no repair command; `backlog doctor`
+  only fixes duplicate task IDs. `backlog/config.yml` is the one deliberate exemption, because
+  list-valued keys cannot be set through `backlog config set`.
+- **Never let two agents edit the same task.** The concurrent-edit fix covers the edit funnel but not
+  reorder, draft saves, the TUI edit path, `doc update` or decision updates.
+- **Finalize in one call**, so an interrupted run cannot leave finished work looking unfinished:
+  `backlog task edit BBC-0001 --check-ac 1 --check-ac 2 -s Done`.
