@@ -11,6 +11,13 @@ consumer-facing contract - its asset table is what downstream reads.
 tenant or account identifiers, no fleet inventory. Write the shape, not the instance. Counts, timings
 and structural findings are fine.
 
+## Task interface
+
+`just check` is the gate and must pass before you commit. It only proves the scripts parse (fmt
+check, lint, a no-op test) - it does not run them or touch a catalog, so a green run here is a weak
+claim; see "Verifying a change" below for what actually proves a change works. There is no `just ci`
+recipe.
+
 ## Hard constraints
 
 **Do not change `CATALOG_SCHEMA_VERSION`.** Endpoints point `--exposure-catalog` at a directory, and
