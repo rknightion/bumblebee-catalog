@@ -26,3 +26,6 @@ __pycache__/
 # Machine-local agent artefacts, never committed
 codex/
 docs/superpowers/
+
+# loop-pi (pi-subagents writes .pi/subagents/)
+.pi/
