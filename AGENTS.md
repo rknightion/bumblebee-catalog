@@ -76,8 +76,7 @@ contributors and for Renovate's dependency dashboard, and anything arriving that
 `backlog/` is committed, so the no-private-data rule above applies to tasks and docs too; a tracker
 feels private, which is exactly why this breaks by accident.
 
-Read the **Agent fan-out protocol (canonical)** doc before designing a wave, and the **Wave operating
-model** doc for this project's own rules (`backlog doc view <id> --plain`).
+Loops: the protocol lives in `~/repos/agent-docs/sources/loop/` (this board's "Loop protocol pointer" doc points there); this repository's loop facts are in `LOOP.md`.
 
 `Parked` is a real status, not a synonym for To Do: attempted, blocked, and left with a concrete
 resume boundary. Do not build on decisions and do not use the MCP surface - decisions are half-built
