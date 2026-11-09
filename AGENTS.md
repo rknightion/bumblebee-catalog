@@ -7,7 +7,7 @@ the moving `catalog-latest` release, fetched by managed endpoints before every B
 binary, no service, no test suite, nothing that runs meaningfully on a laptop. `README.md` is the
 consumer-facing contract - its asset table is what downstream reads.
 
-**No secrets and no private data, ever - including in `backlog/`.** No host names, endpoint names,
+**No secrets and no private data, ever - including in issues, pull request bodies and `.github/tracker/`.** No host names, endpoint names,
 tenant or account identifiers, no fleet inventory. Write the shape, not the instance. Counts, timings
 and structural findings are fine.
 
@@ -69,16 +69,19 @@ Say which level you actually reached.
 Conventional Commits (`type(scope): subject`), because Renovate parses it. Generated catalogs and
 their metas are gitignored and never staged; stage explicit pathspecs.
 
-## Task tracking
+## Tracking work
 
-Tasks are `BBC-NNNN`. GitHub Issues is not the queue - the tracker stays enabled for external
-contributors and for Renovate's dependency dashboard, and anything arriving that way becomes a task.
-`backlog/` is committed, so the no-private-data rule above applies to tasks and docs too; a tracker
-feels private, which is exactly why this breaks by accident.
+Work is tracked in this repository's GitHub issues; they are the only queue. Do not add a checklist
+file such as `ROADMAP.md` beside them. Renovate's Dependency Dashboard is bot-owned: leave it alone.
 
-Loops: the protocol lives in `~/repos/agent-docs/sources/loop/` (this board's "Loop protocol pointer" doc points there); this repository's loop facts are in `LOOP.md`.
-
-`Parked` is a real status, not a synonym for To Do: attempted, blocked, and left with a concrete
-resume boundary. Do not build on decisions and do not use the MCP surface - decisions are half-built
-upstream, so durable reference goes in docs and tasks stay the unit, and MCP is frozen upstream and
-costs 10-50k tokens of permanent context against 1-2k for the CLI.
+- A pull request body says how it relates to an issue, on a line of its own: `Closes #N` with the
+  `Acceptance evidence` table from `.github/pull_request_template.md` (one row for each acceptance
+  criterion of that issue), `Refs #N` when it only relates to one, or `Task: none, <reason>`.
+- A pull request that changes `.github/workflows/` or `.github/actions/` carries no closing keyword:
+  write `Task: none, <reason>`, with `Refs #N` beside it if you like.
+- Contributors never need the project board or the tracker tooling; a maintainer handles both.
+- Issues and pull requests are public, so they carry no host, endpoint, tenant or account
+  identifier and no fleet inventory. Write the shape, not the instance.
+- Older commits and docs cite legacy board ids such as `BBC-0001`. `just issue <ID>` prints the
+  issue each one became; `.github/tracker/id-map.json` is the map, and the retired board's document
+  is kept under `.github/tracker/history/`.

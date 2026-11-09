@@ -3,12 +3,27 @@ tier: guarded
 gate: just check
 ci-required: ci-success
 grafana-stack: none
+tracker: github
+landing: pr
 
 Public repository: no host, endpoint, tenant or account identifier and no fleet inventory in any
 tracked file or loop artifact. `just check` only proves the scripts parse, so a green gate says
 almost nothing here: a lane reports which evidence level it reached (a local run diffed against a
 real input, `just lint-workflows`, or a `workflow_dispatch` run). The failure this repo exists to
 prevent is silent: a bad catalog makes Bumblebee exit 2 before scanning and no alert can fire.
+
+The tracker working model is `~/repos/agent-docs/docs/github-tracker.md` (maintainers only).
+
+## Queue
+
+- The queue is `just tracker queue`: open issues at Project Status Ready on the rknightion Project.
+- A charter selects work by labels (`type:task`, `type:bug`, `type:feature`, `needs-owner`,
+  `needs-triage`) and Project fields (Status, Priority, Effort, Lane). Never queue a `needs-owner` or
+  `needs-triage` issue.
+- Only the root writes issues and the Project, through `just tracker`. A lane returns the status and
+  the AC ticks it wants.
+- A queue row names the issue as `#N`. A legacy board id (`BBC-0001`) resolves with `just issue <ID>`;
+  `.github/tracker/id-map.json` is the map; a row naming only a legacy id fails `loop-lint queue`.
 
 ## Credentials
 
@@ -28,7 +43,6 @@ prevent is silent: a bad catalog makes Bumblebee exit 2 before scanning and no a
   at 05:30 UTC) can assert against a half-updated set. Check the Actions tab; never dispatch both.
 - Generated catalogs, metas and workflow scratch directories are gitignored and never staged.
 - The weekly keepalive empty commit is load-bearing: do not tidy it away.
-- A branch-protection bypass message on a push is the expected mechanism, not an incident.
 
 ## Mutexes
 
