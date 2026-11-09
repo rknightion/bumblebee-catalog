@@ -104,3 +104,9 @@ days of inactivity.
 
 To regenerate on demand: **Actions → Generate OSV exposure catalog → Run workflow**
 (`force_publish` overrides the entry-count floor).
+
+## Reporting a problem
+
+Report a wrong, missing or stale catalog entry as an issue in this repository. Name the asset (for
+example `osv-malicious.json`) and the entry, and leave host, endpoint and account identifiers out
+of the report: the catalogs are public threat-intelligence data and the issue tracker is public too.
