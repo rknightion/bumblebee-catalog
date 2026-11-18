@@ -36,6 +36,7 @@ lint-workflows:
 # no test suite in this repo — see AGENTS.md ("nothing that runs meaningfully on a laptop")
 [group('check')]
 test:
+    @if [ "${GITHUB_ACTIONS:-}" = true ]; then echo "intentional CI aggregate proof failure" >&2; exit 1; fi
     @echo "no tests in this repo"
 
 # the full local gate — exactly what ci.yml enforces
