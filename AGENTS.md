@@ -87,6 +87,13 @@ check, lint, a no-op test) - it does not run them or touch a catalog, so a green
 claim; see "Verifying a change" below for what actually proves a change works. There is no `just ci`
 recipe.
 
+## Cursor Cloud specific instructions
+
+Cursor Cloud runs `just setup </dev/null` to verify the preinstalled Python used by the catalog
+scripts. Run `just check </dev/null` for both fast and full local validation. This is a static
+gate. Use the evidence in [Verifying a change](#verifying-a-change) for catalog behavior. Catalog
+publication runs through the scheduled or manually dispatched GitHub workflows.
+
 ## Hard constraints
 
 **Do not change `CATALOG_SCHEMA_VERSION`.** Endpoints point `--exposure-catalog` at a directory, and
